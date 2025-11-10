@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../../../event_management_bn"
+		},
+		{
+			"path": "../../.."
+		},
+		{
+			"path": "../../../../event_management_admin"
+		}
+	],
+	"settings": {}
+}
