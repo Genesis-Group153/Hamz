@@ -13,6 +13,7 @@ export default function AboutPage() {
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">
+          
           <h1 className="text-4xl md:text-5xl font-extrabold text-black mb-4 flex items-center justify-center gap-3">
             <Info className="h-10 w-10" />
             About Hamz Stadium
