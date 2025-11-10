@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Mail, Phone, Globe, Calendar, Users, Info, Settings, MapPin } from 'lucide-react';
+import { Mail, Phone, Calendar, Users, Info, Settings, MapPin } from 'lucide-react';
 
 export const ProfessionalFooter: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -11,7 +11,7 @@ export const ProfessionalFooter: React.FC = () => {
     <footer className="bg-white border-t border-gray-300">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-8 sm:py-12">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 lg:gap-12 mb-8 sm:mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-10 lg:gap-12 mb-8 sm:mb-10">
             {/* Contact Us */}
             <div className="space-y-4">
               <h3 className="text-base sm:text-lg font-bold text-black">Contact Us</h3>
@@ -67,22 +67,6 @@ export const ProfessionalFooter: React.FC = () => {
                   </Link>
                 </li>
               </ul>
-            </div>
-
-            {/* Follow Us */}
-            <div className="space-y-4">
-              <h3 className="text-base sm:text-lg font-bold text-black">Follow Us</h3>
-              <div className="flex items-center gap-4">
-                <a 
-                  href="https://hamzstadium.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-gray-600 hover:text-primary transition-colors p-2 hover:bg-gray-100 rounded-lg"
-                  aria-label="Visit our website"
-                >
-                  <Globe className="h-5 w-5 sm:h-6 sm:w-6" />
-                </a>
-              </div>
             </div>
           </div>
 
