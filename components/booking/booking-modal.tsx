@@ -38,6 +38,7 @@ interface BookingModalProps {
   tickets: TicketCategory[];
   selectedTicketId?: string;
   usePaymentIntegration?: boolean; // New prop to enable payment integration
+  isLoadingTickets?: boolean; // Loading state for tickets
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({ 
@@ -46,7 +47,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   event, 
   tickets, 
   selectedTicketId,
-  usePaymentIntegration = false
+  usePaymentIntegration = false,
+  isLoadingTickets = false
 }) => {
   const [selectedTicketIdState, setSelectedTicketIdState] = useState<string | null>(selectedTicketId || null);
   const [quantity, setQuantity] = useState<number>(1);
@@ -61,6 +63,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [paymentData, setPaymentData] = useState<any>(null);
   const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<string | null>(null);
   const [gatewayType, setGatewayType] = useState<string | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [showPaymentIframe, setShowPaymentIframe] = useState(false);
 
   const createBooking = useCreateBooking();
   const createBookingWithPayment = useCreateBookingWithPayment();
@@ -85,8 +89,33 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setNotes('');
       setErrors({});
       setStep('tickets');
+      setPaymentUrl(null);
+      setShowPaymentIframe(false);
     }
   }, [isOpen, selectedTicketId]);
+
+  // Listen for payment completion messages from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Accept messages from our own domain (success page) or Pesapal domain
+      const isFromOurDomain = event.origin === window.location.origin;
+      const isFromPesapal = event.origin.includes('pesapal.com') || event.origin.includes('pay.pesapal.com');
+      
+      if (isFromOurDomain || isFromPesapal) {
+        if (event.data === 'payment_complete' || event.data?.type === 'payment_complete') {
+          // Payment completed, redirect to success page
+          const bookingRef = event.data?.bookingReference || bookingData?.bookingReference;
+          const callbackUrl = `${window.location.origin}/payment/success?booking=${bookingRef}`;
+          window.location.href = callbackUrl;
+        }
+      }
+    };
+
+    if (showPaymentIframe) {
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }
+  }, [showPaymentIframe, paymentData, bookingData]);
 
   // Validation
   const validateForm = () => {
@@ -219,6 +248,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     setStep('tickets');
     setBookingData(null);
     setPaymentData(null);
+    setPaymentUrl(null);
+    setShowPaymentIframe(false);
     onClose();
   };
 
@@ -262,8 +293,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           }
         };
 
-        await submitPaymentOrder.mutateAsync(paymentRequest);
-        // Redirect happens automatically in the mutation's onSuccess handler
+        const result = await submitPaymentOrder.mutateAsync(paymentRequest);
+        // Show payment in iframe instead of redirecting
+        if (result?.redirect_url) {
+          setPaymentUrl(result.redirect_url);
+          setShowPaymentIframe(true);
+          setStep('payment');
+        }
         
       } else if (gatewayType === 'MTN' || gatewayType === 'AIRTEL') {
         // For MTN/Airtel: Show phone prompt message
@@ -302,7 +338,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" showCloseButton={false}>
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="text-xl font-semibold">
             {step === 'tickets' && 'Select Tickets'}
@@ -310,7 +346,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             {step === 'payment' && 'Select Payment Method'}
             {step === 'confirmation' && 'Booking Confirmed'}
           </DialogTitle>
-          <Button variant="ghost" size="sm" onClick={handleClose}>
+          <Button variant="ghost" size="sm" onClick={handleClose} className="h-8 w-8 p-0">
             <X className="h-4 w-4" />
           </Button>
         </DialogHeader>
@@ -329,6 +365,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             {/* Ticket Selection */}
             <div className="space-y-4">
               <h4 className="font-medium">Available Tickets</h4>
+              {isLoadingTickets ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
+                  <p className="text-muted-foreground">Loading tickets...</p>
+                </div>
+              ) : tickets.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No tickets available for this event.</p>
+                </div>
+              ) : (
               <div className="grid gap-4">
                 {tickets.map((ticket) => (
                   <div
@@ -379,6 +425,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   </div>
                 ))}
               </div>
+              )}
               
               {errors.ticket && (
                 <p className="text-sm text-destructive">{errors.ticket}</p>
@@ -677,104 +724,121 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       I've Completed the Payment
                     </Button>
                   </>
-                ) : (
-                  <Button 
-                    onClick={handleClose}
-                    className="w-full"
-                  >
-                    Close
-                  </Button>
-                )}
-                <Button 
-                  variant="outline" 
-                  onClick={handleClose} 
-                  className="w-full"
-                >
-                  Close
-                </Button>
+                ) : null}
               </div>
-            ) : (
-              <Button onClick={handleClose} className="w-full">
-                Close
-              </Button>
-            )}
+            ) : null}
           </div>
         )}
 
         {step === 'payment' && selectedTicket && (
           <div className="space-y-6">
-            {/* Order Summary */}
-            <div className="bg-muted/50 rounded-lg p-4">
-              <h4 className="font-medium mb-3 flex items-center gap-2">
-                <Shield className="h-4 w-4 text-primary" />
-                Order Summary
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Event:</span>
-                  <span className="font-medium">{event.title}</span>
+            {showPaymentIframe && paymentUrl ? (
+              // Show payment iframe
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 mb-2">Complete Your Payment</h4>
+                  <p className="text-sm text-blue-700">
+                    Please complete your payment below. Once payment is successful, you'll be redirected back.
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Ticket:</span>
-                  <span className="font-medium">{selectedTicket.categoryName}</span>
+                <div className="border rounded-lg overflow-hidden" style={{ minHeight: '600px' }}>
+                  <iframe
+                    src={paymentUrl}
+                    className="w-full h-full"
+                    style={{ minHeight: '600px', border: 'none' }}
+                    title="Payment Gateway"
+                    allow="payment"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Quantity:</span>
-                  <span className="font-medium">{quantity} ticket(s)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Customer:</span>
-                  <span className="font-medium">{customerName}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t">
-                  <span className="font-semibold">Total Amount:</span>
-                  <span className="font-bold text-primary text-lg">
-                    UGX {totalPrice.toLocaleString()}
-                  </span>
-                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowPaymentIframe(false);
+                    setPaymentUrl(null);
+                    setStep('confirmation');
+                  }}
+                  className="w-full"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel Payment
+                </Button>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Order Summary */}
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <h4 className="font-medium mb-3 flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-primary" />
+                    Order Summary
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Event:</span>
+                      <span className="font-medium">{event.title}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Ticket:</span>
+                      <span className="font-medium">{selectedTicket.categoryName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Quantity:</span>
+                      <span className="font-medium">{quantity} ticket(s)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Customer:</span>
+                      <span className="font-medium">{customerName}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t">
+                      <span className="font-semibold">Total Amount:</span>
+                      <span className="font-bold text-primary text-lg">
+                        UGX {totalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Payment Gateway Selector */}
-            <PaymentGatewaySelector
-              amount={totalPrice}
-              currency="UGX"
-              selectedGateway={selectedPaymentGateway}
-              onSelectGateway={setSelectedPaymentGateway}
-            />
+                {/* Payment Gateway Selector */}
+                <PaymentGatewaySelector
+                  amount={totalPrice}
+                  currency="UGX"
+                  selectedGateway={selectedPaymentGateway}
+                  onSelectGateway={setSelectedPaymentGateway}
+                />
 
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setStep('details')}
-                className="flex-1"
-                disabled={createBookingWithPayment.isPending}
-              >
-                Back
-              </Button>
-              <Button 
-                onClick={handleBookingWithPayment}
-                disabled={createBookingWithPayment.isPending || !selectedPaymentGateway}
-                className="flex-1"
-              >
-                {createBookingWithPayment.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating Booking...
-                  </>
-                ) : selectedPaymentGateway ? (
-                  <>
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Create Booking & Pay with {selectedPaymentGateway}
-                  </>
-                ) : (
-                  <>
-                    Select Payment Method to Continue
-                  </>
-                )}
-              </Button>
-            </div>
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep('details')}
+                    className="flex-1"
+                    disabled={createBookingWithPayment.isPending}
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    onClick={handleBookingWithPayment}
+                    disabled={createBookingWithPayment.isPending || !selectedPaymentGateway}
+                    className="flex-1"
+                  >
+                    {createBookingWithPayment.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating Booking...
+                      </>
+                    ) : selectedPaymentGateway ? (
+                      <>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Create Booking & Pay with {selectedPaymentGateway}
+                      </>
+                    ) : (
+                      <>
+                        Select Payment Method to Continue
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </DialogContent>

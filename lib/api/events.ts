@@ -67,6 +67,11 @@ export interface Event {
   // Analytics fields
   totalBookings?: number
   revenue?: number
+  // Vendor information
+  vendor?: {
+    id: string
+    name: string
+  }
 }
 
 export interface UpdateEventDto {

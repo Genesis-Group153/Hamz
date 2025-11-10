@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { ProfessionalHeader } from '@/components/layout/professional-header';
 import { ProfessionalFooter } from '@/components/layout/professional-footer';
 import { usePublicEvents } from '@/lib/hooks/useEvents';
+import { useEventTickets } from '@/lib/hooks/useTickets';
 import { ProfessionalEventCard } from '@/components/events/professional-event-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +49,28 @@ function EventsPageContent() {
   // Booking modal state
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  const [tickets, setTickets] = useState<any[]>([]);
+  
+  // Fetch tickets for the selected event
+  const { data: eventTickets = [], isLoading: isLoadingTickets } = useEventTickets(selectedEvent?.id || '');
+  
+  // Transform tickets to match booking modal format
+  const tickets = useMemo(() => {
+    if (!eventTickets || eventTickets.length === 0) {
+      // Fallback to event.ticketCategories if available
+      return selectedEvent?.ticketCategories || [];
+    }
+    
+    return eventTickets.map((ticket: any) => ({
+      id: ticket.id,
+      categoryName: ticket.categoryName,
+      price: ticket.price,
+      quantity: ticket.quantity,
+      status: ticket.status || 'AVAILABLE',
+      description: ticket.description,
+      availableQuantity: ticket.availableQuantity || (ticket.quantity - (ticket.soldQuantity || 0)),
+      soldQuantity: ticket.soldQuantity || 0,
+    }));
+  }, [eventTickets, selectedEvent]);
 
   // Extract unique categories
   const categories = useMemo(() => {
@@ -110,7 +132,6 @@ function EventsPageContent() {
 
   const handleBookNow = (event: any) => {
     setSelectedEvent(event);
-    setTickets(event.ticketCategories || []);
     setIsBookingModalOpen(true);
   };
 
@@ -349,13 +370,12 @@ function EventsPageContent() {
       <ProfessionalFooter />
 
       {/* Booking Modal */}
-      {selectedEvent && tickets && (
+      {selectedEvent && (
         <BookingModal
           isOpen={isBookingModalOpen}
           onClose={() => {
             setIsBookingModalOpen(false);
             setSelectedEvent(null);
-            setTickets([]);
           }}
           event={{
             id: selectedEvent.id,
@@ -363,9 +383,11 @@ function EventsPageContent() {
             date: selectedEvent.startDate,
             venue: selectedEvent.venue,
             address: selectedEvent.address,
+            maxTicketsPerEmail: selectedEvent.maxTicketsPerEmail,
           }}
           tickets={tickets}
           usePaymentIntegration={true}
+          isLoadingTickets={isLoadingTickets}
         />
       )}
     </div>

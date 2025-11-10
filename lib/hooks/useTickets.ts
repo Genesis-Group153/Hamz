@@ -75,7 +75,7 @@ export const useEventTickets = (eventId: string) => {
   return useQuery({
     queryKey: ['eventTickets', eventId],
     queryFn: () => ticketsApi.getEventTickets(eventId),
-    enabled: !!eventId,
+    enabled: !!eventId && eventId !== '',
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };

@@ -45,9 +45,8 @@ export const useSubmitPaymentOrder = () => {
     },
     onSuccess: (data) => {
       console.log('useSubmitPaymentOrder: Payment order submitted:', data);
-      if (data.redirect_url) {
-        window.location.href = data.redirect_url;
-      }
+      // Return the redirect_url instead of redirecting - let the component handle it
+      return data;
     },
     onError: (error: any) => {
       console.error('useSubmitPaymentOrder: Payment submission failed:', error);

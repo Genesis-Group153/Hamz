@@ -20,6 +20,16 @@ function PaymentSuccessContent() {
   const bookingRef = searchParams.get('booking');
   const orderTrackingId = searchParams.get('OrderTrackingId');
   const orderMerchantReference = searchParams.get('OrderMerchantReference');
+  
+  // Notify parent window if opened in iframe
+  useEffect(() => {
+    if (window.self !== window.top) {
+      // We're in an iframe, notify parent when payment is verified
+      if (paymentStatus === 'success') {
+        window.parent.postMessage({ type: 'payment_complete', bookingReference: bookingRef }, '*');
+      }
+    }
+  }, [paymentStatus, bookingRef]);
 
   const checkPaymentStatus = async () => {
     try {

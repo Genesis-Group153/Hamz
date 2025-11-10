@@ -150,18 +150,26 @@ export const usePublicEvents = () => {
         const result = await eventsApi.getPublicEvents()
         console.log('Public events fetched:', result)
         
-        // Filter to only show PUBLISHED events
+        // Filter to only show PUBLISHED events from "Nakivubo stadium" vendor
         // Events with status DRAFT, COMPLETED, or CANCELLED will be hidden
         // Workaround: If status is missing, use isPublic as fallback
-        const publishedEvents = result.filter((event: Event) => {
+        const publishedEvents = result.filter((event: any) => {
           // Use isPublic fallback if status is missing (backend issue)
           const effectiveStatus = event.status || (event.isPublic ? 'PUBLISHED' : 'DRAFT')
           const isPublished = effectiveStatus === 'PUBLISHED'
-          console.log(`Event "${event.title}" - Status: ${event.status || 'undefined'}, Effective: ${effectiveStatus}, MaxTicketsPerEmail: ${event.maxTicketsPerEmail}, Showing: ${isPublished}`)
-          return isPublished
+          
+          // Filter by vendor name "Nakivubo stadium"
+          const vendorName = event.vendor?.name || event.vendorName || event.vendor?.vendorName || ''
+          const vendorNameLower = vendorName.toLowerCase().trim()
+          const isNakivuboStadium = vendorNameLower === 'nakivubo stadium' || 
+                                     vendorNameLower.includes('nakivubo stadium')
+          
+          const shouldShow = isPublished && isNakivuboStadium
+          console.log(`Event "${event.title}" - Status: ${event.status || 'undefined'}, Effective: ${effectiveStatus}, Vendor: ${vendorName}, Showing: ${shouldShow}`)
+          return shouldShow
         })
         
-        console.log(`Total events: ${result.length}, Published events: ${publishedEvents.length}`)
+        console.log(`Total events: ${result.length}, Published events from Nakivubo stadium: ${publishedEvents.length}`)
         
         // Log maxTicketsPerEmail for each event
         publishedEvents.forEach((event: Event) => {
