@@ -148,53 +148,131 @@ const createApiClient = (): AxiosInstance => {
   }
 }
 
-// Create the axios client instance with ultimate safety
-let apiClient: AxiosInstance
+// Create the axios client instance lazily to avoid build-time errors
+let apiClientInstance: AxiosInstance | null = null
+let interceptorsSetup = false
 
-// Wrap in try-catch to handle any build-time errors
-try {
-  apiClient = createApiClient()
-  // Verify the client was created and has a valid baseURL
-  if (!apiClient || !apiClient.defaults || !apiClient.defaults.baseURL) {
-    throw new Error('Invalid client created')
+// Lazy getter function - only creates the client when actually needed
+const getApiClient = (): AxiosInstance => {
+  if (apiClientInstance) {
+    return apiClientInstance
   }
-  // Ensure baseURL is never empty - use production URL as default
-  if (apiClient.defaults.baseURL && typeof apiClient.defaults.baseURL === 'string' && apiClient.defaults.baseURL.trim() === '') {
-    apiClient.defaults.baseURL = 'https://api.genesistickets.net/'
-  }
-  // Also ensure it's set if missing
-  if (!apiClient.defaults.baseURL) {
-    apiClient.defaults.baseURL = 'https://api.genesistickets.net/'
-  }
-} catch (error) {
-  // Ultimate fallback - create a minimal axios instance with guaranteed valid baseURL
+
+  // Get a guaranteed valid baseURL first - ALWAYS use production URL as default
+  const DEFAULT_URL = 'https://api.genesistickets.net/'
+  let guaranteedBaseURL = DEFAULT_URL
+  
   try {
-    apiClient = axios.create({
-      baseURL: 'https://api.genesistickets.net/',
+    const url = getValidBaseUrl()
+    if (url && typeof url === 'string' && url.trim() !== '') {
+      // Validate URL before using it
+      try {
+        new URL(url.trim())
+        guaranteedBaseURL = url.trim()
+      } catch {
+        // Invalid URL, use default
+        guaranteedBaseURL = DEFAULT_URL
+      }
+    }
+  } catch {
+    // If anything fails, use default
+    guaranteedBaseURL = DEFAULT_URL
+  }
+  
+  // Final check - ensure baseURL is never empty
+  if (!guaranteedBaseURL || guaranteedBaseURL.trim() === '') {
+    guaranteedBaseURL = DEFAULT_URL
+  }
+
+  // Create the client with ultimate safety - always use a valid URL
+  try {
+    // Validate URL one more time before creating - this is critical
+    let finalBaseURL = DEFAULT_URL
+    try {
+      new URL(guaranteedBaseURL)
+      finalBaseURL = guaranteedBaseURL
+    } catch {
+      // If invalid, use default
+      finalBaseURL = DEFAULT_URL
+    }
+    
+    // Ensure finalBaseURL is never empty
+    if (!finalBaseURL || finalBaseURL.trim() === '') {
+      finalBaseURL = DEFAULT_URL
+    }
+    
+    // CRITICAL: Ensure finalBaseURL is never empty before passing to axios.create()
+    // This is the last chance to prevent empty URL errors
+    if (!finalBaseURL || finalBaseURL.trim() === '') {
+      finalBaseURL = DEFAULT_URL
+    }
+    
+    // Validate URL one final time before creating axios instance
+    try {
+      new URL(finalBaseURL)
+    } catch {
+      // If still invalid, force use default
+      finalBaseURL = DEFAULT_URL
+    }
+    
+    // Now create the axios instance with guaranteed valid URL
+    apiClientInstance = axios.create({
+      baseURL: finalBaseURL,
       headers: {
         'Content-Type': 'application/json',
       },
     })
-    // Set baseURL explicitly to ensure it's never empty - use production URL
-    if (!apiClient.defaults.baseURL) {
-      apiClient.defaults.baseURL = 'https://api.genesistickets.net/'
+    
+    // Verify the client was created and has a valid baseURL
+    if (!apiClientInstance || !apiClientInstance.defaults) {
+      throw new Error('Invalid client created')
     }
-  } catch (fallbackError) {
-    // Last resort - create without baseURL (will be handled in interceptor)
-    apiClient = axios.create({
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }) as AxiosInstance
-    // Ensure baseURL is set - use production URL
-    if (!apiClient.defaults.baseURL) {
-      apiClient.defaults.baseURL = 'https://api.genesistickets.net/'
+    
+    // Ensure baseURL is never empty - use production URL as default
+    if (!apiClientInstance.defaults.baseURL || 
+        (typeof apiClientInstance.defaults.baseURL === 'string' && apiClientInstance.defaults.baseURL.trim() === '')) {
+      apiClientInstance.defaults.baseURL = DEFAULT_URL
+    }
+  } catch (error) {
+    // Ultimate fallback - create a minimal axios instance with guaranteed valid baseURL
+    try {
+      apiClientInstance = axios.create({
+        baseURL: 'https://api.genesistickets.net/',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      // Set baseURL explicitly to ensure it's never empty - use production URL
+      if (!apiClientInstance.defaults.baseURL) {
+        apiClientInstance.defaults.baseURL = 'https://api.genesistickets.net/'
+      }
+    } catch (fallbackError) {
+      // Last resort - create without baseURL (will be handled in interceptor)
+      apiClientInstance = axios.create({
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }) as AxiosInstance
+      // Ensure baseURL is set - use production URL
+      if (!apiClientInstance.defaults.baseURL) {
+        apiClientInstance.defaults.baseURL = 'https://api.genesistickets.net/'
+      }
     }
   }
+
+  // Set up interceptors only once
+  if (!interceptorsSetup) {
+    setupInterceptors(apiClientInstance)
+    interceptorsSetup = true
+  }
+  
+  return apiClientInstance
 }
 
-// Request interceptor to add auth token and validate baseURL
-apiClient.interceptors.request.use(
+// Setup interceptors function
+const setupInterceptors = (client: AxiosInstance) => {
+  // Request interceptor to add auth token and validate baseURL
+  client.interceptors.request.use(
   (config) => {
     // CRITICAL: Ensure baseURL is never empty (safety check)
     // This is critical during build time when env vars might be empty
@@ -223,8 +301,8 @@ apiClient.interceptors.request.use(
     }
     
     // Also set it on the defaults to ensure consistency
-    if (apiClient.defaults.baseURL !== validBaseURL) {
-      apiClient.defaults.baseURL = validBaseURL
+    if (client.defaults.baseURL !== validBaseURL) {
+      client.defaults.baseURL = validBaseURL
     }
     
     // If config.url is relative and baseURL is missing, construct full URL
@@ -250,8 +328,8 @@ apiClient.interceptors.request.use(
   }
 )
 
-// Response interceptor to handle auth errors
-apiClient.interceptors.response.use(
+  // Response interceptor to handle auth errors
+  client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
@@ -277,6 +355,70 @@ apiClient.interceptors.response.use(
     }
     return Promise.reject(error)
   }
-)
+  )
+}
+
+// Create a proxy object that forwards all calls to the lazy-loaded client
+// Only access the client when actually needed (not during build analysis)
+const apiClient = new Proxy({} as AxiosInstance, {
+  get(_target, prop) {
+    // Only create client when actually accessing a property (not during build analysis)
+    // Skip if we're in a build environment and prop is a symbol or internal property
+    if (typeof prop === 'symbol' || prop === 'constructor' || prop === 'toString' || prop === 'valueOf') {
+      // Return a safe default for build-time analysis
+      if (prop === Symbol.toStringTag) {
+        return 'AxiosInstance'
+      }
+    }
+    
+    try {
+      const client = getApiClient()
+      const value = (client as any)[prop]
+      if (typeof value === 'function') {
+        return value.bind(client)
+      }
+      return value
+    } catch (error) {
+      // If client creation fails during build, return a safe default
+      if (typeof prop === 'string' && ['get', 'post', 'put', 'delete', 'patch'].includes(prop)) {
+        return () => Promise.reject(new Error('API client not initialized'))
+      }
+      return undefined
+    }
+  },
+  set(_target, prop, value) {
+    try {
+      const client = getApiClient()
+      ;(client as any)[prop] = value
+      return true
+    } catch {
+      return false
+    }
+  },
+  has(_target, prop) {
+    try {
+      const client = getApiClient()
+      return prop in client
+    } catch {
+      return false
+    }
+  },
+  ownKeys(_target) {
+    try {
+      const client = getApiClient()
+      return Object.keys(client)
+    } catch {
+      return []
+    }
+  },
+  getOwnPropertyDescriptor(_target, prop) {
+    try {
+      const client = getApiClient()
+      return Object.getOwnPropertyDescriptor(client, prop)
+    } catch {
+      return undefined
+    }
+  },
+})
 
 export default apiClient
