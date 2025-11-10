@@ -349,13 +349,28 @@ const HomePage = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 max-w-6xl mx-auto">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
-              <Link key={item} href="/gallery" className="group">
+            {[
+              { src: '/gallery/67e3e75233991.jpg', alt: 'Stadium view 1' },
+              { src: '/gallery/67e3e75234d45.jpg', alt: 'Stadium view 2' },
+              { src: '/gallery/67e423f680e2e.jpg', alt: 'Stadium view 3' },
+              { src: '/gallery/67f97bf3a408f.jpeg', alt: 'Stadium view 4' },
+              { src: '/gallery/stadium-1.jpg', alt: 'Stadium view 5' },
+              { src: '/gallery/stadium-2.jpg', alt: 'Stadium view 6' },
+              { src: '/gallery/stadium-3.jpg', alt: 'Stadium view 7' },
+              { src: '/gallery/stadium-4.jpg', alt: 'Stadium view 8' },
+            ].map((image, index) => (
+              <Link key={index} href="/gallery" className="group">
                 <Card className="border-gray-300 hover:shadow-xl transition-all duration-300 cursor-pointer aspect-square overflow-hidden h-full">
                   <CardContent className="p-0 h-full">
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center group-hover:bg-gray-300 transition-colors">
-                      <ImageIcon className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
-                      <span className="sr-only">Gallery Image {item}</span>
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={image.src}
+                        alt={image.alt}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-300"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
                     </div>
                   </CardContent>
                 </Card>
