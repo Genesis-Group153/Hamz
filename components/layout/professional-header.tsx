@@ -37,7 +37,7 @@ export const ProfessionalHeader: React.FC = () => {
     { name: 'Gallery', href: '/gallery', icon: Image },
   ];
 
-  
+
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 shadow-sm">
@@ -59,7 +59,7 @@ export const ProfessionalHeader: React.FC = () => {
               );
             })}
           </nav>
-
+          {/* Added comment*/}
           {/* Download Magazine Button - Desktop */}
           <div className="hidden lg:flex items-center space-x-3 ml-auto">
             <Button 
