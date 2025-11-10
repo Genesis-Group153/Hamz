@@ -362,7 +362,7 @@ const HomePage = () => {
               <Link key={index} href="/gallery" className="group">
                 <Card className="border-gray-300 hover:shadow-xl transition-all duration-300 cursor-pointer aspect-square overflow-hidden h-full">
                   <CardContent className="p-0 h-full">
-                    <div className="relative w-full h-full">
+                    <div className="relative w-full h-full min-h-[200px]">
                       <Image
                         src={image.src}
                         alt={image.alt}
