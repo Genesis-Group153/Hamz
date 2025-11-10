@@ -17,7 +17,7 @@ import {
   useCreateBookingWithPayment,
   useSubmitPaymentOrder,
 } from "@/lib/hooks/useBookings";
-import { apiClient } from "@/lib/api/client";
+import apiClient from "@/lib/api/client";
 import {
   Loader2,
   Ticket,

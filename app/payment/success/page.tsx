@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, XCircle, AlertCircle, Mail, Download } from 'lucide-react';
-import { apiClient } from '@/lib/api/client';
+import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
 
 function PaymentSuccessContent() {

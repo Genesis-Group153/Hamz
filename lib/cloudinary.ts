@@ -90,8 +90,9 @@ export const getOptimizedImageUrl = (
   const { width, height, quality = 'auto', format = 'auto' } = options
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
   
-  if (!cloudName) {
-    throw new Error('Cloudinary cloud name not configured')
+  if (!cloudName || cloudName.trim() === '') {
+    // Return a placeholder URL during build if Cloudinary is not configured
+    return `https://via.placeholder.com/${width || 400}x${height || 300}`
   }
 
   let url = `https://res.cloudinary.com/${cloudName}/image/upload`

@@ -1,4 +1,4 @@
-import { apiClient } from './client'
+import apiClient from './client'
 
 // Types for our API
 export interface LoginCredentials {
@@ -43,7 +43,9 @@ export const authApi = {
     } catch (error: any) {
       // Enhanced error logging for network errors
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-        const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8500'
+        // Ensure baseURL is never empty
+        const envUrl = process.env.NEXT_PUBLIC_API_URL
+        const baseURL = (!envUrl || envUrl.trim() === '') ? 'http://localhost:8500' : envUrl
         console.error('Network Error - Unable to reach API server')
         console.error('API Base URL:', baseURL)
         console.error('Full URL:', `${baseURL}/users/login`)

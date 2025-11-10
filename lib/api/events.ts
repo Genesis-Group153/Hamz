@@ -1,4 +1,4 @@
-import { apiClient } from './client'
+import apiClient from './client'
 
 // Types for event creation
 export interface EventPhotoDto {
