@@ -1,5 +1,8 @@
 import axios, { AxiosInstance } from 'axios'
 
+// Production API URL - always use this as fallback to prevent build errors
+const PRODUCTION_API_URL = 'https://api.genesistickets.net/'
+
 // Ensure API_BASE_URL is never empty - handle empty strings during build
 const getApiBaseUrl = (): string => {
   // During build time, environment variables might be empty or undefined
@@ -23,9 +26,9 @@ const getApiBaseUrl = (): string => {
   }
   
   // Check for empty string, null, undefined, or whitespace-only strings
+  // ALWAYS return a valid URL - never return empty string
   if (!url || typeof url !== 'string' || url.trim() === '') {
-    // Return a valid default URL that won't cause build errors - use production URL
-    return 'https://api.genesistickets.net/'
+    return PRODUCTION_API_URL
   }
   
   // Ensure the URL is valid
@@ -33,31 +36,35 @@ const getApiBaseUrl = (): string => {
   try {
     // Validate URL format - this might throw during build if URL is invalid
     const testUrl = new URL(trimmedUrl)
-    // Return the validated URL
-    return testUrl.href.replace(/\/$/, '') // Remove trailing slash
-    } catch {
-      // If URL is invalid, return default - use production URL
-      return 'https://api.genesistickets.net/'
-    }
+    // Return the validated URL (ensure it ends with /)
+    const validatedUrl = testUrl.href.endsWith('/') ? testUrl.href : testUrl.href + '/'
+    return validatedUrl || PRODUCTION_API_URL
+  } catch {
+    // If URL is invalid, return default - use production URL
+    return PRODUCTION_API_URL
+  }
 }
 
 // Get API base URL with fallback - ensure it's always a valid string
+// This function ALWAYS returns a valid URL - never empty string
 const getValidBaseUrl = (): string => {
   try {
     const url = getApiBaseUrl()
-    // Final safety check - ensure it's never empty - use production URL
+    // Final safety check - ensure it's never empty
     if (!url || typeof url !== 'string' || url.trim() === '') {
-      return 'https://api.genesistickets.net/'
+      return PRODUCTION_API_URL
     }
     // Validate it's a proper URL
+    const trimmed = url.trim()
     try {
-      new URL(url.trim())
-      return url.trim()
+      new URL(trimmed)
+      // Ensure it ends with / for consistency
+      return trimmed.endsWith('/') ? trimmed : trimmed + '/'
     } catch {
-      return 'https://api.genesistickets.net/'
+      return PRODUCTION_API_URL
     }
   } catch {
-    return 'https://api.genesistickets.net/'
+    return PRODUCTION_API_URL
   }
 }
 
@@ -159,7 +166,8 @@ const getApiClient = (): AxiosInstance => {
   }
 
   // Get a guaranteed valid baseURL first - ALWAYS use production URL as default
-  const DEFAULT_URL = 'https://api.genesistickets.net/'
+  // This constant ensures we NEVER have an empty URL
+  const DEFAULT_URL = PRODUCTION_API_URL
   let guaranteedBaseURL = DEFAULT_URL
   
   try {
@@ -203,48 +211,80 @@ const getApiClient = (): AxiosInstance => {
     
     // CRITICAL: Ensure finalBaseURL is never empty before passing to axios.create()
     // This is the last chance to prevent empty URL errors
-    if (!finalBaseURL || finalBaseURL.trim() === '') {
+    // Multiple checks to ensure we NEVER pass an empty string to axios.create()
+    if (!finalBaseURL || typeof finalBaseURL !== 'string' || finalBaseURL.trim() === '') {
       finalBaseURL = DEFAULT_URL
     }
     
     // Validate URL one final time before creating axios instance
+    let validatedURL = DEFAULT_URL
     try {
-      new URL(finalBaseURL)
+      const testUrl = new URL(finalBaseURL)
+      validatedURL = testUrl.href
+      // Ensure it ends with / for consistency
+      if (!validatedURL.endsWith('/')) {
+        validatedURL = validatedURL + '/'
+      }
     } catch {
       // If still invalid, force use default
-      finalBaseURL = DEFAULT_URL
+      validatedURL = DEFAULT_URL
+    }
+    
+    // Final check - ensure validatedURL is never empty
+    if (!validatedURL || validatedURL.trim() === '') {
+      validatedURL = DEFAULT_URL
     }
     
     // Now create the axios instance with guaranteed valid URL
-    apiClientInstance = axios.create({
-      baseURL: finalBaseURL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    
-    // Verify the client was created and has a valid baseURL
-    if (!apiClientInstance || !apiClientInstance.defaults) {
-      throw new Error('Invalid client created')
-    }
-    
-    // Ensure baseURL is never empty - use production URL as default
-    if (!apiClientInstance.defaults.baseURL || 
-        (typeof apiClientInstance.defaults.baseURL === 'string' && apiClientInstance.defaults.baseURL.trim() === '')) {
-      apiClientInstance.defaults.baseURL = DEFAULT_URL
+    // This should NEVER fail because we've validated the URL multiple times
+    // Wrap in try-catch as final safety net
+    try {
+      // Double-check validatedURL is never empty before passing to axios.create()
+      if (!validatedURL || validatedURL.trim() === '') {
+        validatedURL = DEFAULT_URL
+      }
+      
+      apiClientInstance = axios.create({
+        baseURL: validatedURL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      // Verify the client was created and has a valid baseURL
+      if (!apiClientInstance || !apiClientInstance.defaults) {
+        throw new Error('Invalid client created')
+      }
+      
+      // Ensure baseURL is never empty - use production URL as default
+      if (!apiClientInstance.defaults.baseURL || 
+          (typeof apiClientInstance.defaults.baseURL === 'string' && apiClientInstance.defaults.baseURL.trim() === '')) {
+        apiClientInstance.defaults.baseURL = DEFAULT_URL
+      }
+    } catch (createError: any) {
+      // If axios.create() fails for any reason (including invalid URL), use fallback
+      console.warn('Failed to create axios client with validated URL, using fallback:', createError?.message)
+      // Force create with production URL
+      apiClientInstance = axios.create({
+        baseURL: PRODUCTION_API_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      apiClientInstance.defaults.baseURL = PRODUCTION_API_URL
     }
   } catch (error) {
     // Ultimate fallback - create a minimal axios instance with guaranteed valid baseURL
     try {
       apiClientInstance = axios.create({
-        baseURL: 'https://api.genesistickets.net/',
+        baseURL: PRODUCTION_API_URL,
         headers: {
           'Content-Type': 'application/json',
         },
       })
       // Set baseURL explicitly to ensure it's never empty - use production URL
       if (!apiClientInstance.defaults.baseURL) {
-        apiClientInstance.defaults.baseURL = 'https://api.genesistickets.net/'
+        apiClientInstance.defaults.baseURL = PRODUCTION_API_URL
       }
     } catch (fallbackError) {
       // Last resort - create without baseURL (will be handled in interceptor)
@@ -255,7 +295,7 @@ const getApiClient = (): AxiosInstance => {
       }) as AxiosInstance
       // Ensure baseURL is set - use production URL
       if (!apiClientInstance.defaults.baseURL) {
-        apiClientInstance.defaults.baseURL = 'https://api.genesistickets.net/'
+        apiClientInstance.defaults.baseURL = PRODUCTION_API_URL
       }
     }
   }
@@ -277,7 +317,7 @@ const setupInterceptors = (client: AxiosInstance) => {
     // CRITICAL: Ensure baseURL is never empty (safety check)
     // This is critical during build time when env vars might be empty
     // Get a valid baseURL
-    let validBaseURL = 'https://api.genesistickets.net/'
+    let validBaseURL = PRODUCTION_API_URL
     
     try {
       const envUrl = process.env.NEXT_PUBLIC_API_URL
@@ -287,7 +327,7 @@ const setupInterceptors = (client: AxiosInstance) => {
           validBaseURL = envUrl.trim().replace(/\/$/, '')
         } catch {
           // Invalid URL, use default
-          validBaseURL = 'https://api.genesistickets.net/'
+          validBaseURL = PRODUCTION_API_URL
         }
       }
     } catch {
